@@ -28,6 +28,7 @@ services:
       - GITEA__server__DOMAIN=gitea.localhost
       - GITEA__server__SSH_DOMAIN=gitea.localhost
       - GITEA__server__SSH_PORT=2223
+      - GITEA__webhook__ALLOWED_HOST_LIST=private
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=nexus-net"
@@ -40,7 +41,24 @@ services:
       - ./gitea_data:/data
     networks:
       - nexus-net
-
+  
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: apps/orchestrator/Dockerfile
+    container_name: nexus-orchestrator
+    environment:
+      GITEA_WEBHOOK_SECRET: ${GITEA_WEBHOOK_SECRET:?Set it in infra/.env}
+    volumes:
+      - ../data:/app/data
+    networks:
+      - nexus-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=nexus-net"
+      - "traefik.http.routers.orchestrator.rule=Host(`orchestrator.localhost`)"
+      - "traefik.http.routers.orchestrator.entrypoints=web"
+      - "traefik.http.services.orchestrator.loadbalancer.server.port=8000"
 networks:
   nexus-net:
     name: nexus-net

@@ -70,3 +70,32 @@ def log_deployment(app_name: str, status: str, commit_hash: str = None, logs: st
     """, (app_name, status, commit_hash, logs))
     conn.commit()
     conn.close()
+
+def record_webhook_event(
+    delivery_id: str,
+    event_type: str,
+    repository: str,
+    ref: str,
+    commit_hash: str,
+) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS webhook_events (
+            delivery_id TEXT PRIMARY KEY,
+            event_type TEXT NOT NULL,
+            repository TEXT NOT NULL,
+            ref TEXT,
+            commit_hash TEXT,
+            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        INSERT OR IGNORE INTO webhook_events
+        (delivery_id, event_type, repository, ref, commit_hash)
+        VALUES (?, ?, ?, ?, ?)
+    """, (delivery_id, event_type, repository, ref, commit_hash))
+    inserted = cursor.rowcount == 1
+    conn.commit()
+    conn.close()
+    return inserted
