@@ -60,7 +60,7 @@ def build_and_deploy_app(app_name: str, app_dir: str, repo_url: str = "", intern
         labels = {
             "traefik.enable": "true",
             "traefik.docker.network": NETWORK_NAME,
-            f"traefik.http.routers.{app_name}.rule": f"Host("{app_name}.localhost")",
+            f"traefik.http.routers.{app_name}.rule": f"Host(`{app_name}.localhost`)",
             f"traefik.http.routers.{app_name}.entrypoints": "web",
             f"traefik.http.services.{app_name}.loadbalancer.server.port": str(internal_port)
         }

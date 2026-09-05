@@ -6,12 +6,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 
-from src.db import init_db, record_webhook_event
+from src.db import enqueue_deployment, init_db, record_webhook_event
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nexus.orchestrator")
 
 WEBHOOK_SECRET = os.getenv("GITEA_WEBHOOK_SECRET", "")
+ALLOWED_REPOSITORY = os.getenv("NEXUS_ALLOWED_REPOSITORY", "")
 
 
 @asynccontextmanager
@@ -30,8 +31,8 @@ def healthz():
 
 @app.post("/webhooks/gitea")
 async def receive_gitea_webhook(request: Request):
-    if not WEBHOOK_SECRET:
-        raise HTTPException(status_code=503, detail="Webhook secret is not configured.")
+    if not WEBHOOK_SECRET or not ALLOWED_REPOSITORY:
+        raise HTTPException(status_code=503, detail="Webhook policy is not configured.")
 
     payload = await request.body()
     signature = request.headers.get("X-Gitea-Signature", "")
@@ -46,8 +47,10 @@ async def receive_gitea_webhook(request: Request):
 
     event = request.headers.get("X-Gitea-Event", "unknown")
     delivery_id = request.headers.get("X-Gitea-Delivery", "")
-    body = await request.json()
+    if not delivery_id:
+        raise HTTPException(status_code=400, detail="Missing Gitea delivery ID.")
 
+    body = await request.json()
     repo = body.get("repository", {}).get("full_name", "unknown")
     ref = body.get("ref", "")
     commit = body.get("after", "")
@@ -55,9 +58,19 @@ async def receive_gitea_webhook(request: Request):
     if event != "push" or ref != "refs/heads/main":
         return {"accepted": True, "action": "ignored"}
 
-    is_new = record_webhook_event(delivery_id, event, repo, ref, commit)
-    if not is_new:
+    if repo != ALLOWED_REPOSITORY:
+        logger.warning("Ignored push from non-allowed repository: %s", repo)
+        return {"accepted": True, "action": "repository_not_allowed"}
+
+    if not record_webhook_event(delivery_id, event, repo, ref, commit):
         return {"accepted": True, "action": "duplicate_ignored"}
 
-    logger.info("Accepted main push repo=%s commit=%s", repo, commit)
-    return {"accepted": True, "action": "queued"}
+    job_id = enqueue_deployment(
+        delivery_id=delivery_id,
+        app_name="sample-app",
+        repository=repo,
+        commit_hash=commit,
+    )
+
+    logger.info("Queued deployment job=%s repo=%s commit=%s", job_id, repo, commit)
+    return {"accepted": True, "action": "queued", "job_id": job_id}
