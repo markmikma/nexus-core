@@ -44,7 +44,7 @@ async def receive_gitea_webhook(request: Request):
     if not hmac.compare_digest(signature, expected):
         raise HTTPException(status_code=401, detail="Invalid webhook signature.")
 
-        event = request.headers.get("X-Gitea-Event", "unknown")
+    event = request.headers.get("X-Gitea-Event", "unknown")
     delivery_id = request.headers.get("X-Gitea-Delivery", "")
     body = await request.json()
 
