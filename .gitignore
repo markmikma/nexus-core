@@ -1,0 +1,21 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Secrets / local settings
+.env
+.env.*
+!.env.example
+
+# Container data
+infra/gitea_data/
+infra/traefik_data/
+
+# Editor and logs
+.vscode/
+.idea/
+*.log
+infra/gitekey*
+data/*.db

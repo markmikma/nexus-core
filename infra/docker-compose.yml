@@ -1,0 +1,47 @@
+services:
+  traefik:
+    image: traefik:v3.6.1
+    container_name: nexus-traefik
+    environment:
+      DOCKER_API_VERSION: "1.44"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=nexus-net"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - nexus-net
+
+  gitea:
+    image: gitea/gitea:1.21
+    container_name: nexus-gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__server__ROOT_URL=http://gitea.localhost/
+      - GITEA__server__DOMAIN=gitea.localhost
+      - GITEA__server__SSH_DOMAIN=gitea.localhost
+      - GITEA__server__SSH_PORT=2223
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=nexus-net"
+      - "traefik.http.routers.gitea.rule=Host(`gitea.localhost`)"
+      - "traefik.http.routers.gitea.entrypoints=web"
+      - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+    ports:
+      - "2223:22"
+    volumes:
+      - ./gitea_data:/data
+    networks:
+      - nexus-net
+
+networks:
+  nexus-net:
+    name: nexus-net
+    driver: bridge
