@@ -7,5 +7,6 @@ app = FastAPI()
 def read_root():
     return {
         "status": "online",
-        "message": "Nexus-Core GitOps Deploy Sikeres!",
-    }
+        "message": "Nexus-Core GitOps deploy: commit-alapú v2!",
+    	"gitops_revision": "true-gitea-commit-v3",
+	}
