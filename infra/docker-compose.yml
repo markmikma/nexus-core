@@ -51,6 +51,7 @@ services:
       GITEA_WEBHOOK_SECRET: ${GITEA_WEBHOOK_SECRET:?Set it in infra/.env}
       NEXUS_ALLOWED_REPOSITORY: nexusadmin/nexus-core
       NEXUS_STATUS_TOKEN: ${NEXUS_STATUS_TOKEN:-}
+      NEXUS_DEPLOY_TOKEN: ${NEXUS_DEPLOY_TOKEN:-}
     volumes:
       - ../data:/app/data
     networks:
@@ -81,9 +82,30 @@ services:
     depends_on:
       - orchestrator
     restart: unless-stopped
+
+  gitea-runner:
+    image: gitea/act_runner:latest
+    container_name: nexus-gitea-runner
+    profiles: ["ci"]
+    environment:
+      CONFIG_FILE: /config.yaml
+      GITEA_INSTANCE_URL: http://gitea:3000
+      GITEA_RUNNER_REGISTRATION_TOKEN: ${GITEA_RUNNER_REGISTRATION_TOKEN:-}
+      GITEA_RUNNER_NAME: nexus-core-ci
+      GITEA_RUNNER_LABELS: nexus-ci:docker://python:3.10-slim
+    volumes:
+      - ./act_runner/config.yaml:/config.yaml:ro
+      - runner-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - nexus-net
+    depends_on:
+      - gitea
+    restart: unless-stopped
 networks:
   nexus-net:
     name: nexus-net
     driver: bridge
 volumes:
   worker-workspace:
+  runner-data:

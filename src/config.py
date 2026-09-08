@@ -15,6 +15,7 @@ class Settings:
     allowed_repository: str
     repository_url: str
     status_token: str
+    deploy_token: str
     poll_interval_seconds: int
     network_name: str
 
@@ -30,6 +31,7 @@ class Settings:
             allowed_repository=os.getenv("NEXUS_ALLOWED_REPOSITORY", ""),
             repository_url=os.getenv("GITEA_REPOSITORY_URL", ""),
             status_token=os.getenv("NEXUS_STATUS_TOKEN", ""),
+            deploy_token=os.getenv("NEXUS_DEPLOY_TOKEN", ""),
             poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "3")),
             network_name=os.getenv("NEXUS_NETWORK_NAME", "nexus-net"),
         )

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DeploymentJobResponse(BaseModel):
@@ -22,3 +22,12 @@ class DeploymentJobResponse(BaseModel):
 class DeploymentListResponse(BaseModel):
     items: list[DeploymentJobResponse]
     count: int
+
+
+class DeploymentTriggerRequest(BaseModel):
+    """Trusted CI notification used to release a verified commit."""
+
+    delivery_id: str = Field(min_length=1, max_length=255)
+    repository: str = Field(min_length=1, max_length=255)
+    ref: str = Field(min_length=1, max_length=255)
+    commit_hash: str = Field(min_length=40, max_length=40)

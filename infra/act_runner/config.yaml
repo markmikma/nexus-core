@@ -1,0 +1,19 @@
+log:
+  level: info
+
+runner:
+  file: /data/.runner
+  capacity: 1
+  labels:
+    - "nexus-ci:docker://python:3.10-slim"
+
+cache:
+  enabled: false
+
+container:
+  # Job containers join the same private network as Gitea and the orchestrator.
+  network: nexus-net
+  # Gitea advertises its public URL as gitea.localhost. This maps it back to
+  # Traefik from inside a CI job without publishing another internal endpoint.
+  options: --add-host=gitea.localhost:host-gateway
+  force_pull: true

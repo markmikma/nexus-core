@@ -1,0 +1,70 @@
+name: Nexus-Core CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions: read-all
+
+jobs:
+  verify:
+    name: Verify, test and audit
+    runs-on: nexus-ci
+    steps:
+      - name: Install Git
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends git
+
+      - name: Check out the exact triggering commit
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          git clone "http://oauth2:${GITEA_TOKEN}@gitea:3000/${{ gitea.repository }}.git" .
+          git fetch --depth=1 origin "${{ gitea.sha }}"
+          git checkout --detach "${{ gitea.sha }}"
+
+      - name: Install orchestration dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Compile Python sources
+        run: python -m compileall -q src apps/sample-app scripts
+
+      - name: Audit application dependencies
+        run: pip-audit -r apps/sample-app/requirements.txt
+
+  deploy:
+    name: Queue verified deployment
+    needs: verify
+    if: gitea.event_name == 'push' && gitea.ref == 'refs/heads/main'
+    runs-on: nexus-ci
+    steps:
+      - name: Notify the orchestrator
+        env:
+          NEXUS_DEPLOY_TOKEN: ${{ secrets.NEXUS_DEPLOY_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from urllib.request import Request, urlopen
+
+          payload = {
+              "delivery_id": "ci-${{ gitea.run_number }}-${{ gitea.run_attempt }}-${{ gitea.sha }}",
+              "repository": "${{ gitea.repository }}",
+              "ref": "${{ gitea.ref }}",
+              "commit_hash": "${{ gitea.sha }}",
+          }
+          request = Request(
+              "http://orchestrator:8000/deployments/trigger",
+              data=json.dumps(payload).encode(),
+              method="POST",
+              headers={
+                  "Content-Type": "application/json",
+                  "X-Nexus-Deploy-Token": os.environ["NEXUS_DEPLOY_TOKEN"],
+              },
+          )
+          with urlopen(request, timeout=15) as response:
+              print(response.read().decode())
+          PY

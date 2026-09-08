@@ -13,8 +13,13 @@ from src.db import (
     get_deployment_job,
     init_db,
     list_deployment_jobs,
+    record_webhook_event,
 )
-from src.schemas import DeploymentJobResponse, DeploymentListResponse
+from src.schemas import (
+    DeploymentJobResponse,
+    DeploymentListResponse,
+    DeploymentTriggerRequest,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nexus.orchestrator")
@@ -42,6 +47,15 @@ def require_status_token(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Invalid status token.")
 
 
+def require_deploy_token(request: Request) -> None:
+    if not settings.deploy_token:
+        raise HTTPException(status_code=503, detail="Deployment API is not configured.")
+
+    supplied_token = request.headers.get("X-Nexus-Deploy-Token", "")
+    if not hmac.compare_digest(supplied_token, settings.deploy_token):
+        raise HTTPException(status_code=401, detail="Invalid deployment token.")
+
+
 @app.get("/deployments", response_model=DeploymentListResponse)
 def list_deployments(
     request: Request,
@@ -59,6 +73,41 @@ def get_deployment(job_id: int, request: Request):
     if job is None:
         raise HTTPException(status_code=404, detail="Deployment job not found.")
     return job
+
+
+@app.post("/deployments/trigger")
+def trigger_verified_deployment(
+    payload: DeploymentTriggerRequest,
+    request: Request,
+):
+    """Queue a deployment only after a trusted CI workflow has succeeded."""
+    require_deploy_token(request)
+
+    if payload.repository != settings.allowed_repository:
+        raise HTTPException(status_code=403, detail="Repository is not allowed.")
+    if payload.ref != "refs/heads/main":
+        raise HTTPException(status_code=400, detail="Only main deployments are allowed.")
+    if not re.fullmatch(r"[0-9a-f]{40}", payload.commit_hash):
+        raise HTTPException(status_code=400, detail="Invalid commit hash.")
+
+    job_id = enqueue_webhook_deployment(
+        delivery_id=payload.delivery_id,
+        event_type="ci_success",
+        app_name="sample-app",
+        repository=payload.repository,
+        ref=payload.ref,
+        commit_hash=payload.commit_hash,
+    )
+    if job_id is None:
+        return {"accepted": True, "action": "duplicate_ignored"}
+
+    logger.info(
+        "Queued verified deployment job=%s repo=%s commit=%s",
+        job_id,
+        payload.repository,
+        payload.commit_hash,
+    )
+    return {"accepted": True, "action": "queued", "job_id": job_id}
 
 
 @app.post("/webhooks/gitea")
@@ -97,17 +146,15 @@ async def receive_gitea_webhook(request: Request):
     if not re.fullmatch(r"[0-9a-f]{40}", commit) or commit == "0" * 40:
         raise HTTPException(status_code=400, detail="Invalid push commit hash.")
 
-    job_id = enqueue_webhook_deployment(
+    recorded = record_webhook_event(
         delivery_id=delivery_id,
         event_type=event,
-        app_name="sample-app",
         repository=repo,
         ref=ref,
         commit_hash=commit,
     )
-
-    if job_id is None:
+    if not recorded:
         return {"accepted": True, "action": "duplicate_ignored"}
 
-    logger.info("Queued deployment job=%s repo=%s commit=%s", job_id, repo, commit)
-    return {"accepted": True, "action": "queued", "job_id": job_id}
+    logger.info("Push accepted for CI: repo=%s commit=%s", repo, commit)
+    return {"accepted": True, "action": "ci_required"}
