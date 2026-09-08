@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import subprocess
 import uuid
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -20,10 +21,18 @@ def load_secret() -> str:
     raise RuntimeError("GITEA_WEBHOOK_SECRET nem található az infra/.env fájlban.")
 
 
+def current_commit() -> str:
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        text=True,
+    ).strip()
+
+
 secret = load_secret()
 payload = {
     "ref": "refs/heads/main",
-    "after": "0" * 40,
+    "after": current_commit(),
     "repository": {
         "full_name": "nexusadmin/nexus-core",
     },

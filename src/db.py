@@ -131,33 +131,86 @@ def enqueue_deployment(delivery_id, app_name, repository, commit_hash):
     return job_id
 
 
+def enqueue_webhook_deployment(delivery_id, event_type, app_name, repository, ref, commit_hash):
+    """Atomically deduplicate a webhook and create its deployment job."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("""
+            INSERT OR IGNORE INTO webhook_events
+            (delivery_id, event_type, repository, ref, commit_hash)
+            VALUES (?, ?, ?, ?, ?)
+        """, (delivery_id, event_type, repository, ref, commit_hash))
+
+        if cursor.rowcount != 1:
+            conn.commit()
+            return None
+
+        cursor.execute("""
+            INSERT INTO deployment_jobs
+            (delivery_id, app_name, repository, commit_hash)
+            VALUES (?, ?, ?, ?)
+        """, (delivery_id, app_name, repository, commit_hash))
+        job_id = cursor.lastrowid
+        conn.commit()
+        return job_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def claim_next_deployment():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("BEGIN IMMEDIATE")
-    cursor.execute("""
-        SELECT * FROM deployment_jobs
-        WHERE status = 'queued'
-        ORDER BY id
-        LIMIT 1
-    """)
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("""
+            SELECT * FROM deployment_jobs
+            WHERE status = 'queued'
+            ORDER BY id
+            LIMIT 1
+        """)
 
-    job = cursor.fetchone()
-    if job is None:
+        job = cursor.fetchone()
+        if job is None:
+            conn.commit()
+            return None
+
+        cursor.execute("""
+            UPDATE deployment_jobs
+            SET status = 'running', started_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (job["id"],))
+
         conn.commit()
+        return dict(job)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         conn.close()
-        return None
 
+
+def recover_interrupted_deployments():
+    """Retry jobs left in running state when the worker process was interrupted."""
+    conn = get_connection()
+    cursor = conn.cursor()
     cursor.execute("""
         UPDATE deployment_jobs
-        SET status = 'running', started_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-    """, (job["id"],))
-
+        SET status = 'queued',
+            logs = COALESCE(logs, '') || '\nWorker restarted; deployment queued again.',
+            started_at = NULL
+        WHERE status = 'running'
+    """)
+    recovered = cursor.rowcount
     conn.commit()
     conn.close()
-    return dict(job)
+    return recovered
 
 
 def finish_deployment(job_id, status, logs=None, container_id=None):

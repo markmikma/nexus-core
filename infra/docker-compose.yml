@@ -41,7 +41,7 @@ services:
       - ./gitea_data:/data
     networks:
       - nexus-net
-  
+
   orchestrator:
     build:
       context: ..
@@ -68,11 +68,13 @@ services:
     command: ["python", "-m", "src.worker"]
     environment:
       NEXUS_ALLOWED_REPOSITORY: nexusadmin/nexus-core
-      NEXUS_SAMPLE_APP_DIR: /workspace/apps/sample-app
+      GITEA_REPOSITORY_URL: ssh://git@gitea:22/nexusadmin/nexus-core.git
     volumes:
       - ../data:/app/data
-      - ../:/workspace:ro
+      - worker-workspace:/workspace
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./secrets/deployment_worker_ed25519:/run/secrets/gitea_deploy_key:ro
+      - ./secrets/gitea_known_hosts:/run/secrets/gitea_known_hosts:ro
     networks:
       - nexus-net
     depends_on:
@@ -82,3 +84,5 @@ networks:
   nexus-net:
     name: nexus-net
     driver: bridge
+volumes:
+  worker-workspace:

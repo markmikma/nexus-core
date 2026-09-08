@@ -2,11 +2,12 @@ import hashlib
 import hmac
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 
-from src.db import enqueue_deployment, init_db, record_webhook_event
+from src.db import enqueue_webhook_deployment, init_db
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nexus.orchestrator")
@@ -62,15 +63,20 @@ async def receive_gitea_webhook(request: Request):
         logger.warning("Ignored push from non-allowed repository: %s", repo)
         return {"accepted": True, "action": "repository_not_allowed"}
 
-    if not record_webhook_event(delivery_id, event, repo, ref, commit):
-        return {"accepted": True, "action": "duplicate_ignored"}
+    if not re.fullmatch(r"[0-9a-f]{40}", commit) or commit == "0" * 40:
+        raise HTTPException(status_code=400, detail="Invalid push commit hash.")
 
-    job_id = enqueue_deployment(
+    job_id = enqueue_webhook_deployment(
         delivery_id=delivery_id,
+        event_type=event,
         app_name="sample-app",
         repository=repo,
+        ref=ref,
         commit_hash=commit,
     )
+
+    if job_id is None:
+        return {"accepted": True, "action": "duplicate_ignored"}
 
     logger.info("Queued deployment job=%s repo=%s commit=%s", job_id, repo, commit)
     return {"accepted": True, "action": "queued", "job_id": job_id}

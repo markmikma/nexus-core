@@ -8,6 +8,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+infra/secrets/
 
 # Container data
 infra/gitea_data/

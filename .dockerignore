@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+venv
+__pycache__/
+*.py[cod]
+*.db
+data/
+infra/.env
+infra/gitea_data/
+infra/traefik_data/
+infra/secrets/
+infra/gitekey*

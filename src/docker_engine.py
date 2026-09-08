@@ -31,8 +31,15 @@ def stop_and_remove_container(container_name: str):
         pass
     except Exception as e:
         print(f"[!] Hiba a konténer eltávolításakor ({container_name}): {e}")
+        raise
 
-def build_and_deploy_app(app_name: str, app_dir: str, repo_url: str = "", internal_port: int = 8000) -> dict:
+def build_and_deploy_app(
+    app_name: str,
+    app_dir: str,
+    repo_url: str = "",
+    internal_port: int = 8000,
+    commit_hash: str | None = None,
+) -> dict:
     if not client:
         raise RuntimeError("A Docker SDK nem tudott csatlakozni a daemonhoz.")
 
@@ -71,13 +78,11 @@ def build_and_deploy_app(app_name: str, app_dir: str, repo_url: str = "", intern
             name=container_name,
             detach=True,
             labels=labels,
+            network=NETWORK_NAME,
             restart_policy={"Name": "unless-stopped"}
         )
-        
-        # Hálózathoz csatlakoztatás explicit módon
-        target_network.connect(container)
-        
-        print(f"[✓] Konténer elindítva és hálózatra kötve: {container.short_id}")
+
+        print(f"[✓] Konténer elindítva a {NETWORK_NAME} hálózaton: {container.short_id}")
         
         register_or_update_app(
             name=app_name,
@@ -86,7 +91,12 @@ def build_and_deploy_app(app_name: str, app_dir: str, repo_url: str = "", intern
             port=internal_port,
             container_id=container.short_id
         )
-        log_deployment(app_name, status="success", logs="Sikeres deploy.")
+        log_deployment(
+            app_name,
+            status="success",
+            commit_hash=commit_hash,
+            logs="Sikeres deploy.",
+        )
         
         return {
             "status": "success",
@@ -99,5 +109,10 @@ def build_and_deploy_app(app_name: str, app_dir: str, repo_url: str = "", intern
         error_msg = str(e)
         print(f"[!] Deploy hiba ({app_name}): {error_msg}")
         register_or_update_app(app_name, repo_url, status="failed")
-        log_deployment(app_name, status="failed", logs=error_msg)
+        log_deployment(
+            app_name,
+            status="failed",
+            commit_hash=commit_hash,
+            logs=error_msg,
+        )
         return {"status": "error", "message": error_msg}

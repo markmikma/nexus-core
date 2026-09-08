@@ -5,7 +5,12 @@ import subprocess
 import time
 from pathlib import Path
 
-from src.db import claim_next_deployment, finish_deployment, init_db
+from src.db import (
+    claim_next_deployment,
+    finish_deployment,
+    init_db,
+    recover_interrupted_deployments,
+)
 from src.docker_engine import build_and_deploy_app
 from src.security import audit_python_dependencies
 
@@ -81,15 +86,21 @@ def process_job(job: dict) -> None:
 
         if not app_dir.is_dir():
             raise RuntimeError(f"Nem található alkalmazásmappa: {app_dir}")
-            logger.info("Dependency security scan indítása: job=%s", job["id"])
-            audit_python_dependencies(app_dir)
-            logger.info("Dependency security scan sikeres: job=%s", job["id"])
+
+        logger.info("Dependency security scan indítása: job=%s", job["id"])
+        audit_python_dependencies(app_dir)
+        logger.info("Dependency security scan sikeres: job=%s", job["id"])
+
         result = build_and_deploy_app(
             app_name="sample-app",
             app_dir=str(app_dir),
             repo_url=job["repository"],
             internal_port=8000,
+            commit_hash=job["commit_hash"],
         )
+
+        if result.get("status") != "success":
+            raise RuntimeError(result.get("message", "A Docker deploy sikertelen."))
 
         container_id = result.get("container_id") if isinstance(result, dict) else None
 
@@ -117,6 +128,9 @@ def process_job(job: dict) -> None:
 
 def main() -> None:
     init_db()
+    recovered = recover_interrupted_deployments()
+    if recovered:
+        logger.warning("%s félbeszakadt deployment újra sorba állítva.", recovered)
     logger.info("Deployment worker elindult.")
 
     while True:
