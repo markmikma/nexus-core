@@ -1,11 +1,13 @@
-import os
 import sqlite3
 
-DB_PATH = os.path.abspath("./data/nexus.db")
+from src.config import settings
+
+
+DB_PATH = settings.database_path
 
 
 def get_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
@@ -211,6 +213,28 @@ def recover_interrupted_deployments():
     conn.commit()
     conn.close()
     return recovered
+
+
+def list_deployment_jobs(limit: int = 20):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM deployment_jobs
+        ORDER BY id DESC
+        LIMIT ?
+    """, (limit,))
+    jobs = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jobs
+
+
+def get_deployment_job(job_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM deployment_jobs WHERE id = ?", (job_id,))
+    job = cursor.fetchone()
+    conn.close()
+    return dict(job) if job else None
 
 
 def finish_deployment(job_id, status, logs=None, container_id=None):

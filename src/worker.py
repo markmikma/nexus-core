@@ -5,6 +5,7 @@ import subprocess
 import time
 from pathlib import Path
 
+from src.config import settings
 from src.db import (
     claim_next_deployment,
     finish_deployment,
@@ -20,9 +21,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("nexus.deployment-worker")
 
-POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", "3"))
-ALLOWED_REPOSITORY = os.getenv("NEXUS_ALLOWED_REPOSITORY", "")
-GITEA_REPOSITORY_URL = os.getenv("GITEA_REPOSITORY_URL", "")
 WORKSPACE_ROOT = Path("/workspace/jobs")
 
 SSH_KEY_PATH = "/run/secrets/gitea_deploy_key"
@@ -54,7 +52,7 @@ def run_git(arguments: list[str], cwd: Path | None = None) -> None:
 
 
 def checkout_exact_commit(job: dict) -> Path:
-    if not GITEA_REPOSITORY_URL:
+    if not settings.repository_url:
         raise RuntimeError("Hiányzik a GITEA_REPOSITORY_URL beállítás.")
 
     commit_hash = job["commit_hash"]
@@ -64,7 +62,7 @@ def checkout_exact_commit(job: dict) -> Path:
     workspace.parent.mkdir(parents=True, exist_ok=True)
 
     logger.info("Repository klónozása: job=%s", job["id"])
-    run_git(["clone", "--no-checkout", GITEA_REPOSITORY_URL, str(workspace)])
+    run_git(["clone", "--no-checkout", settings.repository_url, str(workspace)])
 
     logger.info("Konkrét commit checkout: %s", commit_hash)
     run_git(["checkout", "--detach", commit_hash], cwd=workspace)
@@ -76,7 +74,7 @@ def process_job(job: dict) -> None:
     workspace: Path | None = None
 
     try:
-        if job["repository"] != ALLOWED_REPOSITORY:
+        if job["repository"] != settings.allowed_repository:
             raise RuntimeError(
                 f"Nem engedélyezett repository: {job['repository']}"
             )
@@ -137,7 +135,7 @@ def main() -> None:
         job = claim_next_deployment()
 
         if job is None:
-            time.sleep(POLL_INTERVAL_SECONDS)
+            time.sleep(settings.poll_interval_seconds)
             continue
 
         process_job(job)

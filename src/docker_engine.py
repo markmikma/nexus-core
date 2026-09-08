@@ -1,5 +1,5 @@
 import docker
-import os
+from src.config import settings
 from src.db import register_or_update_app, log_deployment
 
 try:
@@ -8,7 +8,7 @@ except Exception as e:
     print(f"[!] Hiba a Docker csatlakozáskor: {e}")
     client = None
 
-NETWORK_NAME = "nexus-net"
+NETWORK_NAME = settings.network_name
 
 def get_nexus_network():
     """Megkeresi a docker-compose által létrehozott nexus-net hálózatot."""

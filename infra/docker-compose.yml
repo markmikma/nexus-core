@@ -50,6 +50,7 @@ services:
     environment:
       GITEA_WEBHOOK_SECRET: ${GITEA_WEBHOOK_SECRET:?Set it in infra/.env}
       NEXUS_ALLOWED_REPOSITORY: nexusadmin/nexus-core
+      NEXUS_STATUS_TOKEN: ${NEXUS_STATUS_TOKEN:-}
     volumes:
       - ../data:/app/data
     networks:

@@ -5,16 +5,19 @@ import os
 import re
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 
-from src.db import enqueue_webhook_deployment, init_db
+from src.config import settings
+from src.db import (
+    enqueue_webhook_deployment,
+    get_deployment_job,
+    init_db,
+    list_deployment_jobs,
+)
+from src.schemas import DeploymentJobResponse, DeploymentListResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nexus.orchestrator")
-
-WEBHOOK_SECRET = os.getenv("GITEA_WEBHOOK_SECRET", "")
-ALLOWED_REPOSITORY = os.getenv("NEXUS_ALLOWED_REPOSITORY", "")
-
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -30,15 +33,43 @@ def healthz():
     return {"status": "ok", "service": "nexus-orchestrator"}
 
 
+def require_status_token(request: Request) -> None:
+    if not settings.status_token:
+        raise HTTPException(status_code=503, detail="Status API is not configured.")
+
+    supplied_token = request.headers.get("X-Nexus-Status-Token", "")
+    if not hmac.compare_digest(supplied_token, settings.status_token):
+        raise HTTPException(status_code=401, detail="Invalid status token.")
+
+
+@app.get("/deployments", response_model=DeploymentListResponse)
+def list_deployments(
+    request: Request,
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    require_status_token(request)
+    jobs = list_deployment_jobs(limit=limit)
+    return {"items": jobs, "count": len(jobs)}
+
+
+@app.get("/deployments/{job_id}", response_model=DeploymentJobResponse)
+def get_deployment(job_id: int, request: Request):
+    require_status_token(request)
+    job = get_deployment_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Deployment job not found.")
+    return job
+
+
 @app.post("/webhooks/gitea")
 async def receive_gitea_webhook(request: Request):
-    if not WEBHOOK_SECRET or not ALLOWED_REPOSITORY:
+    if not settings.webhook_secret or not settings.allowed_repository:
         raise HTTPException(status_code=503, detail="Webhook policy is not configured.")
 
     payload = await request.body()
     signature = request.headers.get("X-Gitea-Signature", "")
     expected = hmac.new(
-        WEBHOOK_SECRET.encode(),
+        settings.webhook_secret.encode(),
         payload,
         hashlib.sha256,
     ).hexdigest()
@@ -59,7 +90,7 @@ async def receive_gitea_webhook(request: Request):
     if event != "push" or ref != "refs/heads/main":
         return {"accepted": True, "action": "ignored"}
 
-    if repo != ALLOWED_REPOSITORY:
+    if repo != settings.allowed_repository:
         logger.warning("Ignored push from non-allowed repository: %s", repo)
         return {"accepted": True, "action": "repository_not_allowed"}
 
