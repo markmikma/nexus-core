@@ -32,6 +32,9 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q src apps/sample-app scripts
 
+      - name: Run deployment unit tests
+        run: python -m unittest discover -s tests -v
+
       - name: Audit application dependencies
         run: pip-audit -r apps/sample-app/requirements.txt
 
