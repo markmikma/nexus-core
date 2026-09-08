@@ -10,6 +10,14 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=nexus-net"
       - "--entrypoints.web.address=:80"
+      - "--ping=true"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     ports:
       - "80:80"
       - "8080:8080"
@@ -39,6 +47,13 @@ services:
       - "2223:22"
     volumes:
       - ./gitea_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - nexus-net
 
@@ -54,6 +69,13 @@ services:
       NEXUS_DEPLOY_TOKEN: ${NEXUS_DEPLOY_TOKEN:-}
     volumes:
       - ../data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     networks:
       - nexus-net
     labels:
@@ -80,7 +102,10 @@ services:
     networks:
       - nexus-net
     depends_on:
-      - orchestrator
+      orchestrator:
+        condition: service_healthy
+      gitea:
+        condition: service_healthy
     restart: unless-stopped
 
   gitea-runner:
@@ -100,7 +125,8 @@ services:
     networks:
       - nexus-net
     depends_on:
-      - gitea
+      gitea:
+        condition: service_healthy
     restart: unless-stopped
 networks:
   nexus-net:
