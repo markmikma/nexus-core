@@ -14,6 +14,7 @@ GITHUB_TOKEN = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9_]{36,255}|github_pat_[A-Za
 GENERIC_CREDENTIAL = re.compile(
     r"(?m)^\s*(?:export\s+)?([A-Z][A-Z0-9_]*(?:PASSWORD|SECRET|TOKEN|API_KEY|APIKEY)[A-Z0-9_]*)\s*[:=]\s*[\"']?([^\s\"'#]+)"
 )
+ALLOW_MARKER = "nexus-secret-scan: allow"
 PLACEHOLDER_VALUES = {
     "",
     "none",
@@ -32,6 +33,12 @@ def line_number(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
+def is_suppressed(text: str, offset: int) -> bool:
+    line_start = text.rfind("\n", 0, offset) + 1
+    line_end = text.find("\n", offset)
+    return ALLOW_MARKER in text[line_start: line_end if line_end != -1 else None]
+
+
 def is_placeholder(value: str) -> bool:
     normalized = value.strip().lower()
     return (
@@ -39,6 +46,10 @@ def is_placeholder(value: str) -> bool:
         or normalized.startswith(("${", "$", "<", "your_", "replace_", "replace-with-"))
         or normalized.endswith("}")
     )
+
+
+def is_code_expression(value: str) -> bool:
+    return value.startswith(("re.", "os.", "settings.", "Path(", "str(", "int(", "bool(", "getattr("))
 
 
 def scan_text(relative_path: str, text: str) -> list[dict]:
@@ -50,12 +61,14 @@ def scan_text(relative_path: str, text: str) -> list[dict]:
     )
     for kind, pattern in patterns:
         for match in pattern.finditer(text):
+            if is_suppressed(text, match.start()):
+                continue
             findings.append(
                 {"file": relative_path, "line": line_number(text, match.start()), "type": kind}
             )
     for match in GENERIC_CREDENTIAL.finditer(text):
         name, value = match.groups()
-        if not is_placeholder(value):
+        if not is_placeholder(value) and not is_code_expression(value) and not is_suppressed(text, match.start()):
             findings.append(
                 {
                     "file": relative_path,
