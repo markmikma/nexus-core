@@ -5,7 +5,7 @@ runner:
   file: /data/.runner
   capacity: 1
   labels:
-    - "nexus-ci:docker://python:3.10-slim"
+    - "nexus-ci:docker://infra-orchestrator:latest"
 
 cache:
   enabled: false
@@ -16,4 +16,4 @@ container:
   # Gitea advertises its public URL as gitea.localhost. This maps it back to
   # Traefik from inside a CI job without publishing another internal endpoint.
   options: --add-host=gitea.localhost:host-gateway
-  force_pull: true
+  force_pull: false
