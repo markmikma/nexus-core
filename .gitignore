@@ -21,3 +21,7 @@ infra/traefik_data/
 infra/gitekey*
 data/*.db
 data/security-reports/
+
+# Local TLS material
+infra/certs/*
+!infra/certs/.gitkeep

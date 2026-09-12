@@ -1,0 +1,4 @@
+tls:
+  certificates:
+    - certFile: /certs/nexus-localhost.crt
+      keyFile: /certs/nexus-localhost.key

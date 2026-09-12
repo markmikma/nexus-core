@@ -95,7 +95,7 @@ def require_status_token(request: Request) -> str:
         audit_security_event("status_api_access", "success", "automation-token", request.url.path)
         return "admin"
 
-    session_role = read_session(request.cookies.get(COOKIE_NAME), settings.status_token)
+    session_role = read_session(request.cookies.get(COOKIE_NAME), settings.session_secret)
     if session_role:
         audit_security_event("dashboard_session", "success", session_role, request.url.path)
         return session_role
@@ -115,7 +115,7 @@ def require_deploy_token(request: Request) -> None:
 
 @app.post("/auth/login")
 async def login(request: Request):
-    if not settings.status_token:
+    if not settings.session_secret:
         raise HTTPException(status_code=503, detail="Dashboard session signing is not configured.")
     body = await request.json()
     username, password = body.get("username", ""), body.get("password", "")
@@ -124,16 +124,16 @@ async def login(request: Request):
         audit_security_event("dashboard_login", "failure", username or "unknown", "/auth/login")
         raise HTTPException(status_code=401, detail="Invalid credentials.")
     response = JSONResponse({"role": role})
-    response.set_cookie(COOKIE_NAME, make_session(role, settings.status_token), httponly=True, samesite="strict", max_age=28800)
+    response.set_cookie(COOKIE_NAME, make_session(role, settings.session_secret), httponly=True, secure=settings.dashboard_cookie_secure, samesite="strict", max_age=28800)
     audit_security_event("dashboard_login", "success", username, "/auth/login")
     return response
 
 
 @app.post("/auth/logout")
 def logout(request: Request):
-    role = read_session(request.cookies.get(COOKIE_NAME), settings.status_token)
+    role = read_session(request.cookies.get(COOKIE_NAME), settings.session_secret)
     response = JSONResponse({"logged_out": True})
-    response.delete_cookie(COOKIE_NAME, httponly=True, samesite="strict")
+    response.delete_cookie(COOKIE_NAME, httponly=True, secure=settings.dashboard_cookie_secure, samesite="strict")
     audit_security_event("dashboard_logout", "success", role or "unknown", "/auth/logout")
     return response
 

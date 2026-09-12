@@ -9,13 +9,22 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _environment_flag(name: str, default: bool) -> bool:
-    """Reads a strict boolean setting from the environment."""
     value = os.getenv(name, str(default)).strip().lower()
     if value in {"1", "true", "yes", "on"}:
         return True
     if value in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"{name} must be a boolean value.")
+
+
+def _secret_or_environment(name: str) -> str:
+    secret_file = os.getenv(f"{name}_FILE", "")
+    if secret_file:
+        try:
+            return Path(secret_file).read_text().strip()
+        except OSError:
+            pass
+    return os.getenv(name, "")
 
 
 @dataclass(frozen=True)
@@ -26,6 +35,8 @@ class Settings:
     repository_url: str
     status_token: str
     deploy_token: str
+    session_secret: str
+    dashboard_cookie_secure: bool
     dashboard_admin_hash: str
     dashboard_viewer_hash: str
     poll_interval_seconds: int
@@ -41,14 +52,15 @@ class Settings:
         database_path = Path(
             os.getenv("NEXUS_DB_PATH", str(PROJECT_ROOT / "data" / "nexus.db"))
         ).expanduser()
-
         return cls(
             database_path=database_path,
-            webhook_secret=os.getenv("GITEA_WEBHOOK_SECRET", ""),
+            webhook_secret=_secret_or_environment("GITEA_WEBHOOK_SECRET"),
             allowed_repository=os.getenv("NEXUS_ALLOWED_REPOSITORY", ""),
             repository_url=os.getenv("GITEA_REPOSITORY_URL", ""),
-            status_token=os.getenv("NEXUS_STATUS_TOKEN", ""),
-            deploy_token=os.getenv("NEXUS_DEPLOY_TOKEN", ""),
+            status_token=_secret_or_environment("NEXUS_STATUS_TOKEN"),
+            deploy_token=_secret_or_environment("NEXUS_DEPLOY_TOKEN"),
+            session_secret=_secret_or_environment("NEXUS_SESSION_SECRET"),
+            dashboard_cookie_secure=_environment_flag("NEXUS_DASHBOARD_COOKIE_SECURE", True),
             dashboard_admin_hash=os.getenv("NEXUS_DASHBOARD_ADMIN_PASSWORD_HASH", ""),
             dashboard_viewer_hash=os.getenv("NEXUS_DASHBOARD_VIEWER_PASSWORD_HASH", ""),
             poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "3")),

@@ -5,11 +5,15 @@ services:
     environment:
       DOCKER_API_VERSION: "1.44"
     command:
-      - "--api.insecure=true"
+      - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=nexus-net"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--providers.file.filename=/etc/traefik/dynamic/tls.yml"
       - "--entrypoints.metrics.address=:8082"
       - "--metrics.prometheus=true"
       - "--metrics.prometheus.entrypoint=metrics"
@@ -23,9 +27,11 @@ services:
       start_period: 10s
     ports:
       - "80:80"
-      - "8080:8080"
+      - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic/tls.yml:/etc/traefik/dynamic/tls.yml:ro
+      - ./certs:/certs:ro
     networks:
       - nexus-net
 
@@ -35,7 +41,7 @@ services:
     environment:
       - USER_UID=1000
       - USER_GID=1000
-      - GITEA__server__ROOT_URL=http://gitea.localhost/
+      - GITEA__server__ROOT_URL=https://gitea.localhost/
       - GITEA__server__DOMAIN=gitea.localhost
       - GITEA__server__SSH_DOMAIN=gitea.localhost
       - GITEA__server__SSH_PORT=2223
@@ -44,7 +50,8 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=nexus-net"
       - "traefik.http.routers.gitea.rule=Host(`gitea.localhost`)"
-      - "traefik.http.routers.gitea.entrypoints=web"
+      - "traefik.http.routers.gitea.entrypoints=websecure"
+      - "traefik.http.routers.gitea.tls=true"
       - "traefik.http.services.gitea.loadbalancer.server.port=3000"
     ports:
       - "2223:22"
@@ -70,10 +77,14 @@ services:
       NEXUS_ALLOWED_REPOSITORY: nexusadmin/nexus-core
       NEXUS_STATUS_TOKEN: ${NEXUS_STATUS_TOKEN:-}
       NEXUS_DEPLOY_TOKEN: ${NEXUS_DEPLOY_TOKEN:-}
+      NEXUS_DASHBOARD_COOKIE_SECURE: "true"
+      NEXUS_SESSION_SECRET_FILE: /run/secrets/session_signing_secret
       NEXUS_DASHBOARD_ADMIN_PASSWORD_HASH: ${NEXUS_DASHBOARD_ADMIN_PASSWORD_HASH:?Set it in infra/.env}
       NEXUS_DASHBOARD_VIEWER_PASSWORD_HASH: ${NEXUS_DASHBOARD_VIEWER_PASSWORD_HASH:?Set it in infra/.env}
     volumes:
       - ../data:/app/data
+    secrets:
+      - session_signing_secret
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
@@ -87,11 +98,13 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=nexus-net"
       - "traefik.http.routers.orchestrator.rule=Host(`orchestrator.localhost`)"
-      - "traefik.http.routers.orchestrator.entrypoints=web"
+      - "traefik.http.routers.orchestrator.entrypoints=websecure"
+      - "traefik.http.routers.orchestrator.tls=true"
       - "traefik.http.routers.orchestrator.service=orchestrator"
       - "traefik.http.services.orchestrator.loadbalancer.server.port=8000"
       - "traefik.http.routers.nexus-dashboard.rule=Host(`nexus.localhost`)"
-      - "traefik.http.routers.nexus-dashboard.entrypoints=web"
+      - "traefik.http.routers.nexus-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.nexus-dashboard.tls=true"
       - "traefik.http.routers.nexus-dashboard.service=nexus-dashboard"
       - "traefik.http.services.nexus-dashboard.loadbalancer.server.port=8000"
   deployment-worker:
@@ -190,7 +203,8 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=nexus-net"
       - "traefik.http.routers.grafana.rule=Host(`grafana.localhost`)"
-      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls=true"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
 networks:
@@ -204,3 +218,7 @@ volumes:
   grafana-data:
   trivy-cache:
     name: nexus-trivy-cache
+
+secrets:
+  session_signing_secret:
+    file: ./secrets/session_signing_secret

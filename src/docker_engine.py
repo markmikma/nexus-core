@@ -137,7 +137,8 @@ def build_and_deploy_app(
             "traefik.enable": "true",
             "traefik.docker.network": NETWORK_NAME,
             f"traefik.http.routers.{app_name}.rule": f"Host(`{app_name}.localhost`)",
-            f"traefik.http.routers.{app_name}.entrypoints": "web",
+            f"traefik.http.routers.{app_name}.entrypoints": "websecure",
+            f"traefik.http.routers.{app_name}.tls": "true",
             f"traefik.http.services.{app_name}.loadbalancer.server.port": str(internal_port),
         }
 
@@ -178,7 +179,7 @@ def build_and_deploy_app(
             "status": "success",
             "app_name": app_name,
             "container_id": candidate.short_id,
-            "url": f"http://{app_name}.localhost",
+            "url": f"https://{app_name}.localhost",
         }
 
     except Exception as error:
