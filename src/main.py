@@ -115,6 +115,8 @@ def require_deploy_token(request: Request) -> None:
 
 @app.post("/auth/login")
 async def login(request: Request):
+    if not settings.status_token:
+        raise HTTPException(status_code=503, detail="Dashboard session signing is not configured.")
     body = await request.json()
     username, password = body.get("username", ""), body.get("password", "")
     role = "admin" if username == "admin" and verify_password(password, settings.dashboard_admin_hash) else "viewer" if username == "viewer" and verify_password(password, settings.dashboard_viewer_hash) else None

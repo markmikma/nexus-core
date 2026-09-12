@@ -1,5 +1,6 @@
 """Local RBAC authentication with scrypt password hashes and signed sessions."""
 import base64
+import binascii
 import hashlib
 import hmac
 import os
@@ -36,7 +37,7 @@ def verify_password(password: str, encoded: str) -> bool:
             p=1,
         )
         return hmac.compare_digest(candidate, base64.urlsafe_b64decode(digest))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, binascii.Error):
         return False
 
 
@@ -58,5 +59,5 @@ def read_session(value: str | None, secret: str) -> str | None:
             and hmac.compare_digest(signature, expected)
         )
         return role if is_valid else None
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, binascii.Error):
         return None
