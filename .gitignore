@@ -20,3 +20,4 @@ infra/traefik_data/
 *.log
 infra/gitekey*
 data/*.db
+data/security-reports/
