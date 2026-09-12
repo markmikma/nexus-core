@@ -27,6 +27,9 @@ jobs:
       - name: Run deployment unit tests
         run: python -m unittest discover -s tests -v
 
+      - name: Generate CycloneDX SBOM
+        run: python scripts/generate_sbom.py --output build/sbom.cdx.json requirements.txt apps/sample-app/requirements.txt
+
       - name: Audit application dependencies
         run: pip-audit -r apps/sample-app/requirements.txt
 
