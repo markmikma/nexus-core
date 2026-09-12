@@ -13,11 +13,6 @@ jobs:
     name: Verify, test and audit
     runs-on: nexus-ci
     steps:
-      - name: Install Git
-        run: |
-          apt-get update
-          apt-get install --yes --no-install-recommends git
-
       - name: Check out the exact triggering commit
         env:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
@@ -25,9 +20,6 @@ jobs:
           git clone "http://oauth2:${GITEA_TOKEN}@gitea:3000/${{ gitea.repository }}.git" .
           git fetch --depth=1 origin "${{ gitea.sha }}"
           git checkout --detach "${{ gitea.sha }}"
-
-      - name: Install orchestration dependencies
-        run: pip install --no-cache-dir --retries 5 --timeout 120 -r requirements.txt
 
       - name: Compile Python sources
         run: python -m compileall -q src apps/sample-app scripts
