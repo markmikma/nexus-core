@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import time
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -62,6 +63,11 @@ async def collect_http_metrics(request: Request, call_next):
 
 
 app.mount("/metrics", make_asgi_app())
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard():
+    return FileResponse(Path(__file__).with_name("dashboard.html"), media_type="text/html")
 
 
 @app.get("/healthz")

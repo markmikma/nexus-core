@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nexus-Core Control Plane</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background:#0b1020; color:#e7edf8; }
+    body { max-width:1100px; margin:40px auto; padding:0 20px; }
+    h1 { margin-bottom:4px; } .muted { color:#9ba8bc; }
+    .panel { background:#151c30; border:1px solid #293652; border-radius:12px; padding:18px; margin:20px 0; }
+    input { background:#0b1020; color:#e7edf8; border:1px solid #405276; border-radius:6px; padding:10px; min-width:320px; }
+    button { background:#4f8cff; color:white; border:0; border-radius:6px; padding:10px 14px; cursor:pointer; }
+    table { border-collapse:collapse; width:100%; margin-top:12px; } th,td { border-bottom:1px solid #293652; padding:10px; text-align:left; vertical-align:top; }
+    .success { color:#5ee6a8; } .failed { color:#ff7b8d; } .running,.queued { color:#ffd166; }
+    code, pre { font-family:ui-monospace, monospace; } pre { white-space:pre-wrap; max-height:420px; overflow:auto; }
+    a { color:#8ab4ff; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <h1>Nexus-Core Control Plane</h1>
+  <p class="muted">Lokális GitOps, deploy és DevSecOps evidence nézet.</p>
+  <section class="panel">
+    <label for="token">Status token (csak ebben a böngészőfülben marad)</label><br><br>
+    <input id="token" type="password" autocomplete="off" placeholder="NEXUS_STATUS_TOKEN">
+    <button id="load">Deployok betöltése</button>
+    <p id="message" class="muted"></p>
+  </section>
+  <section class="panel">
+    <h2>Legutóbbi deploymentek</h2>
+    <table><thead><tr><th>ID</th><th>Állapot</th><th>Commit</th><th>Befejezve</th><th>Evidence</th></tr></thead><tbody id="jobs"><tr><td colspan="5" class="muted">Adj meg status tokent.</td></tr></tbody></table>
+  </section>
+  <section class="panel" id="report-panel" hidden>
+    <h2 id="report-title">Security report</h2><pre id="report"></pre>
+  </section>
+<script>
+let statusToken = '';
+const message = document.querySelector('#message');
+async function api(path) {
+  const response = await fetch(path, {headers:{'X-Nexus-Status-Token': statusToken}});
+  if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+  return response.json();
+}
+async function showReports(commit) {
+  const data = await api(`/security-reports/${commit}`);
+  const links = data.items.map(item => `<a data-type="${item.type}" data-commit="${commit}">${item.type}</a> (${item.bytes} B)`).join('<br>');
+  document.querySelector(`#reports-${commit}`).innerHTML = links || '<span class="muted">Nincs riport</span>';
+  document.querySelectorAll('[data-type]').forEach(link => link.onclick = async () => {
+    const report = await api(`/security-reports/${link.dataset.commit}/${link.dataset.type}`);
+    document.querySelector('#report-title').textContent = `${link.dataset.type} — ${link.dataset.commit.slice(0,12)}`;
+    document.querySelector('#report').textContent = JSON.stringify(report, null, 2);
+    document.querySelector('#report-panel').hidden = false;
+  });
+}
+async function load() {
+  statusToken = document.querySelector('#token').value;
+  try {
+    const data = await api('/deployments?limit=12');
+    document.querySelector('#jobs').innerHTML = data.items.map(job => `<tr><td>${job.id}</td><td class="${job.status}">${job.status}</td><td><code>${job.commit_hash.slice(0,12)}</code></td><td>${job.finished_at || '—'}</td><td id="reports-${job.commit_hash}"><a data-load="${job.commit_hash}">betöltés</a></td></tr>`).join('');
+    document.querySelectorAll('[data-load]').forEach(link => link.onclick = () => showReports(link.dataset.load));
+    message.textContent = `${data.count} deployment betöltve.`;
+  } catch (error) { message.textContent = `Hiba: ${error.message}`; }
+}
+ document.querySelector('#load').onclick = load;
+</script>
+</body></html>
