@@ -25,3 +25,6 @@ data/security-reports/
 # Local TLS material
 infra/certs/*
 !infra/certs/.gitkeep
+
+# Local recovery artifacts
+backups/
