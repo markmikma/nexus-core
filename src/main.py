@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import hmac
 import logging
@@ -76,12 +77,21 @@ def healthz():
 
 
 def require_status_token(request: Request) -> None:
-    if not settings.status_token:
-        raise HTTPException(status_code=503, detail="Status API is not configured.")
-
+    """Allows the automation token or local dashboard Basic Auth."""
     supplied_token = request.headers.get("X-Nexus-Status-Token", "")
-    if not hmac.compare_digest(supplied_token, settings.status_token):
-        raise HTTPException(status_code=401, detail="Invalid status token.")
+    if settings.status_token and hmac.compare_digest(supplied_token, settings.status_token):
+        return
+
+    authorization = request.headers.get("Authorization", "")
+    if authorization.startswith("Basic ") and settings.dashboard_password:
+        try:
+            username, password = base64.b64decode(authorization[6:]).decode().split(":", 1)
+        except (ValueError, UnicodeDecodeError):
+            username, password = "", ""
+        if hmac.compare_digest(username, settings.dashboard_username) and hmac.compare_digest(password, settings.dashboard_password):
+            return
+
+    raise HTTPException(status_code=401, detail="Invalid dashboard credentials or status token.")
 
 
 def require_deploy_token(request: Request) -> None:
