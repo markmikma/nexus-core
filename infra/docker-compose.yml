@@ -72,6 +72,8 @@ services:
       NEXUS_DEPLOY_TOKEN: ${NEXUS_DEPLOY_TOKEN:-}
       NEXUS_DASHBOARD_USERNAME: ${NEXUS_DASHBOARD_USERNAME:-admin}
       NEXUS_DASHBOARD_PASSWORD: ${NEXUS_DASHBOARD_PASSWORD:-}
+      NEXUS_DASHBOARD_ADMIN_PASSWORD_HASH: null
+      NEXUS_DASHBOARD_VIEWER_PASSWORD_HASH: null
     volumes:
       - ../data:/app/data
     restart: unless-stopped

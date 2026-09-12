@@ -28,6 +28,8 @@ class Settings:
     deploy_token: str
     dashboard_username: str
     dashboard_password: str
+    dashboard_admin_hash: str
+    dashboard_viewer_hash: str
     poll_interval_seconds: int
     network_name: str
     image_scan_enabled: bool
@@ -51,6 +53,8 @@ class Settings:
             deploy_token=os.getenv("NEXUS_DEPLOY_TOKEN", ""),
             dashboard_username=os.getenv("NEXUS_DASHBOARD_USERNAME", "admin"),
             dashboard_password=os.getenv("NEXUS_DASHBOARD_PASSWORD", ""),
+            dashboard_admin_hash=os.getenv("NEXUS_DASHBOARD_ADMIN_PASSWORD_HASH", ""),
+            dashboard_viewer_hash=os.getenv("NEXUS_DASHBOARD_VIEWER_PASSWORD_HASH", ""),
             poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "3")),
             network_name=os.getenv("NEXUS_NETWORK_NAME", "nexus-net"),
             image_scan_enabled=_environment_flag("NEXUS_IMAGE_SCAN_ENABLED", True),

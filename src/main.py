@@ -9,9 +9,10 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from prometheus_client import Counter, Histogram, make_asgi_app
 
+from src.auth import COOKIE_NAME, make_session, read_session, verify_password
 from src.config import settings
 from src.db import (
     enqueue_webhook_deployment,
@@ -93,7 +94,11 @@ def require_status_token(request: Request) -> None:
     supplied_token = request.headers.get("X-Nexus-Status-Token", "")
     if settings.status_token and hmac.compare_digest(supplied_token, settings.status_token):
         audit_security_event("status_api_access", "success", "automation-token", request.url.path)
-        return
+        return "admin"
+    session_role = read_session(request.cookies.get(COOKIE_NAME), settings.status_token)
+    if session_role:
+        audit_security_event("dashboard_session", "success", session_role, request.url.path)
+        return session_role
 
     authorization = request.headers.get("Authorization", "")
     if authorization.startswith("Basic ") and settings.dashboard_password:
@@ -103,7 +108,7 @@ def require_status_token(request: Request) -> None:
             username, password = "", ""
         if hmac.compare_digest(username, settings.dashboard_username) and hmac.compare_digest(password, settings.dashboard_password):
             audit_security_event("dashboard_login", "success", username, request.url.path)
-            return
+            return "admin"
 
     audit_security_event("dashboard_login", "failure", "unknown", request.url.path)
     raise HTTPException(status_code=401, detail="Invalid dashboard credentials or status token.")
@@ -116,6 +121,20 @@ def require_deploy_token(request: Request) -> None:
     supplied_token = request.headers.get("X-Nexus-Deploy-Token", "")
     if not hmac.compare_digest(supplied_token, settings.deploy_token):
         raise HTTPException(status_code=401, detail="Invalid deployment token.")
+
+
+@app.post("/auth/login")
+async def login(request: Request):
+    body = await request.json()
+    username, password = body.get("username", ""), body.get("password", "")
+    role = "admin" if username == "admin" and verify_password(password, settings.dashboard_admin_hash) else "viewer" if username == "viewer" and verify_password(password, settings.dashboard_viewer_hash) else None
+    if not role:
+        audit_security_event("dashboard_login", "failure", username or "unknown", "/auth/login")
+        raise HTTPException(status_code=401, detail="Invalid credentials.")
+    response = JSONResponse({"role": role})
+    response.set_cookie(COOKIE_NAME, make_session(role, settings.status_token), httponly=True, samesite="strict", max_age=28800)
+    audit_security_event("dashboard_login", "success", username, "/auth/login")
+    return response
 
 
 @app.get("/deployments", response_model=DeploymentListResponse)
@@ -139,7 +158,8 @@ def get_deployment(job_id: int, request: Request):
 
 @app.get("/security-reports/{commit_hash}")
 def get_security_reports(commit_hash: str, request: Request):
-    require_status_token(request)
+    role = require_status_token(request)
+    if role != "admin": raise HTTPException(status_code=403, detail="Admin role required.")
     try:
         return {"commit_hash": commit_hash, "items": list_reports(commit_hash)}
     except ValueError as error:
@@ -148,7 +168,8 @@ def get_security_reports(commit_hash: str, request: Request):
 
 @app.get("/security-reports/{commit_hash}/{report_type}")
 def download_security_report(commit_hash: str, report_type: str, request: Request):
-    require_status_token(request)
+    role = require_status_token(request)
+    if role != "admin": raise HTTPException(status_code=403, detail="Admin role required.")
     try:
         path = report_path(commit_hash, report_type)
     except ValueError as error:
@@ -160,7 +181,8 @@ def download_security_report(commit_hash: str, report_type: str, request: Reques
 
 @app.get("/security-events")
 def get_security_events(request: Request, limit: int = Query(default=50, ge=1, le=200)):
-    require_status_token(request)
+    role = require_status_token(request)
+    if role != "admin": raise HTTPException(status_code=403, detail="Admin role required.")
     events = list_security_events(limit)
     return {"items": events, "count": len(events)}
 
