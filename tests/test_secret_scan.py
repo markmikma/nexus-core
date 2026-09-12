@@ -4,6 +4,13 @@ from scripts.scan_secrets import scan_text
 
 
 class SecretScanTests(unittest.TestCase):
+    def test_allows_docker_secret_file_reference(self):
+        findings = scan_text(
+            "compose.yml",
+            "NEXUS_SESSION_SECRET_FILE: /run/secrets/session_signing_secret",
+        )
+        self.assertEqual(findings, [])
+
     def test_detects_private_key_without_echoing_its_content(self):
         findings = scan_text("key.txt", "-----BEGIN PRIVATE KEY-----\nprivate material")  # nexus-secret-scan: allow
         self.assertEqual(findings[0]["type"], "private-key")

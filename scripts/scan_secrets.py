@@ -52,6 +52,10 @@ def is_code_expression(value: str) -> bool:
     return value.startswith(("re.", "os.", "settings.", "Path(", "str(", "int(", "bool(", "getattr("))
 
 
+def is_secret_file_reference(name: str, value: str) -> bool:
+    return name.endswith("_FILE") and value.startswith("/run/secrets/")
+
+
 def scan_text(relative_path: str, text: str) -> list[dict]:
     findings: list[dict] = []
     patterns = (
@@ -68,7 +72,12 @@ def scan_text(relative_path: str, text: str) -> list[dict]:
             )
     for match in GENERIC_CREDENTIAL.finditer(text):
         name, value = match.groups()
-        if not is_placeholder(value) and not is_code_expression(value) and not is_suppressed(text, match.start()):
+        if (
+            not is_placeholder(value)
+            and not is_code_expression(value)
+            and not is_secret_file_reference(name, value)
+            and not is_suppressed(text, match.start())
+        ):
             findings.append(
                 {
                     "file": relative_path,
