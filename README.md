@@ -1,8 +1,29 @@
 # Nexus-Core
 
-> A local-first DevSecOps and GitOps control plane for WSL2/Linux, built as a production-minded homelab platform.
+> An operations-focused homelab platform for WSL2/Linux: deploy applications, monitor their health, investigate events, and recover safely.
 
-Nexus-Core demonstrates a complete secure delivery path: a Git push is verified by CI, deployed from the exact commit SHA, security-gated, health-checked, and exposed through Traefik. It is designed to be inspectable in a technical interview, not just to look like a collection of containers.
+Nexus-Core is a local-first control plane built to practise the day-to-day concerns of application and platform operations. It brings together service deployment, health checks, rollback, monitoring, access control, audit events, and backup validation in one inspectable environment.
+
+## Operations-focused overview
+
+| Operational concern | How Nexus-Core approaches it |
+| --- | --- |
+| Service visibility | Prometheus metrics, Grafana dashboards, cAdvisor, structured audit events, and deployment-backlog alerts |
+| Safe changes | Exact-commit deployments, a candidate container, internal health checks, and rollback to the prior release |
+| Application support | `/healthz` and `/readyz` endpoints, a status script, a dashboard, and environment-specific routes |
+| Access and accountability | Admin/viewer RBAC, signed sessions, and an SQLite audit trail |
+| Recovery | SQLite-consistent backups, a stored Compose topology, and an explicit backup verification step |
+
+**What this project demonstrates:** I can reason about an application's operational lifecycle: observe it, make a controlled change, verify the result, investigate what happened, and recover when required.
+
+> **Portfolio scope:** this is a local homelab project, not a claim of production readiness. Its purpose is to make operational decisions and trade-offs easy to discuss in an interview.
+
+## Quick path for reviewers
+
+1. Read the [architecture](#architecture) and the [delivery and security flow](#delivery-and-security-flow).
+2. Start the stack with the [quick start](#quick-start).
+3. Verify service state with `python3 scripts/platform_status.py` and inspect the dashboard, health endpoints, or Grafana.
+4. See the [operations manual](docs/OPERATIONS.md) and [test checklist](docs/TEST_CHECKLIST.md) for the operating procedures.
 
 ## Why this project exists
 
