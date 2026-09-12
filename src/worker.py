@@ -14,6 +14,7 @@ from src.db import (
 )
 from src.docker_engine import build_and_deploy_app
 from src.security import audit_python_dependencies
+from src.reporting import report_directory, report_path
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -70,6 +71,21 @@ def checkout_exact_commit(job: dict) -> Path:
     return workspace
 
 
+def generate_security_evidence(workspace: Path, commit_hash: str) -> Path:
+    """Rebuild CI security reports from the exact deploy commit."""
+    directory = report_directory(commit_hash)
+    directory.mkdir(parents=True, exist_ok=True)
+    commands = (
+        (["python", "scripts/scan_secrets.py", "--repository", str(workspace), "--output", str(report_path(commit_hash, "secret-scan"))], "Secret scan"),
+        (["python", "scripts/generate_sbom.py", "--output", str(report_path(commit_hash, "sbom")), "requirements.txt", "apps/sample-app/requirements.txt"], "SBOM generation"),
+    )
+    for command, name in commands:
+        completed = subprocess.run(command, cwd=workspace, text=True, capture_output=True, check=False)
+        if completed.returncode != 0:
+            raise RuntimeError(f"{name} failed: {(completed.stderr or completed.stdout).strip()}")
+    return directory
+
+
 def process_job(job: dict) -> None:
     workspace: Path | None = None
 
@@ -85,6 +101,9 @@ def process_job(job: dict) -> None:
         if not app_dir.is_dir():
             raise RuntimeError(f"Nem található alkalmazásmappa: {app_dir}")
 
+        evidence_directory = generate_security_evidence(workspace, job["commit_hash"])
+        logger.info("Security evidence saved: %s", evidence_directory)
+
         logger.info("Dependency security scan indítása: job=%s", job["id"])
         audit_python_dependencies(app_dir)
         logger.info("Dependency security scan sikeres: job=%s", job["id"])
@@ -95,6 +114,7 @@ def process_job(job: dict) -> None:
             repo_url=job["repository"],
             internal_port=8000,
             commit_hash=job["commit_hash"],
+            image_scan_report_path=report_path(job["commit_hash"], "image-scan"),
         )
 
         if result.get("status") != "success":

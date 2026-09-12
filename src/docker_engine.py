@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 import docker
 
@@ -102,6 +103,7 @@ def build_and_deploy_app(
     repo_url: str = "",
     internal_port: int = 8000,
     commit_hash: str | None = None,
+    image_scan_report_path: Path | None = None,
 ) -> dict:
     if not client:
         raise RuntimeError("A Docker SDK nem tudott csatlakozni a daemonhoz.")
@@ -126,7 +128,7 @@ def build_and_deploy_app(
         )
         print(f"[✓] Docker image felépült: {image_tag}")
 
-        scan_summary = scan_image(client, image_tag)
+        scan_summary = scan_image(client, image_tag, image_scan_report_path)
         if scan_summary["enabled"]:
             print("[✓] Image security gate passed: no blocking findings.")
 

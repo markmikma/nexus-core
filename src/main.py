@@ -7,6 +7,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 from prometheus_client import Counter, Histogram, make_asgi_app
 
 from src.config import settings
@@ -17,6 +18,7 @@ from src.db import (
     list_deployment_jobs,
     record_webhook_event,
 )
+from src.reporting import list_reports, report_path
 from src.schemas import (
     DeploymentJobResponse,
     DeploymentListResponse,
@@ -102,6 +104,27 @@ def get_deployment(job_id: int, request: Request):
     if job is None:
         raise HTTPException(status_code=404, detail="Deployment job not found.")
     return job
+
+
+@app.get("/security-reports/{commit_hash}")
+def get_security_reports(commit_hash: str, request: Request):
+    require_status_token(request)
+    try:
+        return {"commit_hash": commit_hash, "items": list_reports(commit_hash)}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/security-reports/{commit_hash}/{report_type}")
+def download_security_report(commit_hash: str, report_type: str, request: Request):
+    require_status_token(request)
+    try:
+        path = report_path(commit_hash, report_type)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Security report not found.")
+    return FileResponse(path, media_type="application/json", filename=path.name)
 
 
 @app.post("/deployments/trigger")

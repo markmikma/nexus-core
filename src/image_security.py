@@ -1,11 +1,12 @@
 """Image vulnerability scanning used by the deployment worker."""
 
 import json
+from pathlib import Path
 
 from src.config import settings
 
 
-def scan_image(docker_client, image_reference: str) -> dict:
+def scan_image(docker_client, image_reference: str, report_path: Path | None = None) -> dict:
     """Blocks promotion when Trivy reports a policy-matching vulnerability.
 
     The scanner runs in a short-lived container and uses a named Docker volume for
@@ -41,6 +42,9 @@ def scan_image(docker_client, image_reference: str) -> dict:
         remove=True,
     )
     report = json.loads(output.decode("utf-8"))
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     findings = [
         vulnerability
         for result in report.get("Results", [])
