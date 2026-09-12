@@ -153,6 +153,7 @@ services:
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+      - ./observability/security-alerts.yml:/etc/prometheus/rules/security-alerts.yml:ro
     networks:
       - nexus-net
     restart: unless-stopped

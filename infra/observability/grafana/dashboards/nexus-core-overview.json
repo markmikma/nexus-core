@@ -1,17 +1,141 @@
 {
-  "annotations": {"list": []},
+  "annotations": {
+    "list": []
+  },
   "editable": false,
   "panels": [
-    {"type":"stat","title":"Scrape targets online","datasource":{"uid":"prometheus"},"targets":[{"expr":"sum(up{job=~\"traefik|orchestrator|sample-app|cadvisor\"})","refId":"A"}],"gridPos":{"h":7,"w":6,"x":0,"y":0}},
-    {"type":"timeseries","title":"HTTP request rate","datasource":{"uid":"prometheus"},"targets":[{"expr":"sum by (service) (rate(nexus_http_requests_total[5m]))","legendFormat":"{{service}}","refId":"A"}],"gridPos":{"h":7,"w":18,"x":6,"y":0}},
-    {"type":"timeseries","title":"HTTP p95 latency","datasource":{"uid":"prometheus"},"targets":[{"expr":"histogram_quantile(0.95, sum by (le, service) (rate(nexus_http_request_duration_seconds_bucket[5m])))","legendFormat":"{{service}}","refId":"A"}],"gridPos":{"h":8,"w":12,"x":0,"y":7}},
-    {"type":"timeseries","title":"Container memory","datasource":{"uid":"prometheus"},"targets":[{"expr":"sum by (name) (container_memory_usage_bytes{name=~\"nexus-.*\"})","legendFormat":"{{name}}","refId":"A"}],"gridPos":{"h":8,"w":12,"x":12,"y":7}}
+    {
+      "type": "stat",
+      "title": "Scrape targets online",
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(up{job=~\"traefik|orchestrator|sample-app|cadvisor\"})",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP request rate",
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(nexus_http_requests_total[5m]))",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 7,
+        "w": 18,
+        "x": 6,
+        "y": 0
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP p95 latency",
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, service) (rate(nexus_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Container memory",
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (name) (container_memory_usage_bytes{name=~\"nexus-.*\"})",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Failed dashboard logins (10m)",
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(nexus_security_events_total{event_type=\\\"dashboard_login\\\",outcome=\\\"failure\\\"}[10m]))",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 15
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Security audit event rate",
+      "datasource": {
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (event_type,outcome) (rate(nexus_security_events_total[5m]))",
+          "legendFormat": "{{event_type}} {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 7,
+        "w": 18,
+        "x": 6,
+        "y": 15
+      }
+    }
   ],
   "schemaVersion": 39,
-  "tags": ["nexus-core", "observability"],
-  "templating": {"list": []},
-  "time": {"from":"now-1h","to":"now"},
+  "tags": [
+    "nexus-core",
+    "observability"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "title": "Nexus-Core Overview",
   "uid": "nexus-core-overview",
-  "version": 1
+  "version": 2
 }

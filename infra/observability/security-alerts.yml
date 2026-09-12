@@ -1,0 +1,12 @@
+groups:
+  - name: nexus-security
+    rules:
+      - alert: NexusRepeatedFailedDashboardLogin
+        expr: sum(increase(nexus_security_events_total{event_type="dashboard_login",outcome="failure"}[10m])) >= 5
+        for: 1m
+        labels:
+          severity: warning
+          service: nexus-orchestrator
+        annotations:
+          summary: Repeated failed Nexus dashboard logins
+          description: Five or more failed dashboard/API authentication attempts occurred within ten minutes.

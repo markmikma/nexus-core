@@ -54,3 +54,9 @@ docker exec nexus-orchestrator python -c \
 ## Sikertelen deploy és rollback
 
 Minden új verzió candidate konténerként indul. A worker a candidate saját hálózati
+
+## Security alert és első válasz
+
+A Prometheus riaszt, ha tíz percen belül legalább öt hibás dashboard/API hitelesítés történik. A riasztás neve `NexusRepeatedFailedDashboardLogin`.
+
+Első válasz: ellenőrizd a `GET /security-events` audit eseményeket, ne oszd meg a jelszót vagy tokent, szükség esetén cseréld a `NEXUS_DASHBOARD_PASSWORD` értéket az `infra/.env` fájlban, majd indítsd újra az orchestrátort. Ezután vizsgáld meg, hogy a sikertelen kérések folytatódnak-e.
