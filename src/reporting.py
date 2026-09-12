@@ -9,6 +9,7 @@ REPORT_FILENAMES = {
     "secret-scan": "secret-scan.json",
     "sbom": "sbom.cdx.json",
     "image-scan": "image-scan.json",
+    "python-sast": "python-sast.json",
 }
 COMMIT_HASH = re.compile(r"[0-9a-f]{40}")
 

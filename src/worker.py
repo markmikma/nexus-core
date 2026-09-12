@@ -78,6 +78,7 @@ def generate_security_evidence(workspace: Path, commit_hash: str) -> Path:
     commands = (
         (["python", "scripts/scan_secrets.py", "--repository", str(workspace), "--output", str(report_path(commit_hash, "secret-scan"))], "Secret scan"),
         (["python", "scripts/generate_sbom.py", "--output", str(report_path(commit_hash, "sbom")), "requirements.txt", "apps/sample-app/requirements.txt"], "SBOM generation"),
+        (["python", "scripts/scan_python_security.py", "--repository", str(workspace), "--output", str(report_path(commit_hash, "python-sast"))], "Python SAST"),
     )
     for command, name in commands:
         completed = subprocess.run(command, cwd=workspace, text=True, capture_output=True, check=False)

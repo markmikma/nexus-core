@@ -33,8 +33,17 @@ jobs:
       - name: Generate CycloneDX SBOM
         run: python scripts/generate_sbom.py --output build/sbom.cdx.json requirements.txt apps/sample-app/requirements.txt
 
+      - name: Run Python SAST policy
+        run: python scripts/scan_python_security.py --output build/python-sast.json
+
       - name: Audit application dependencies
         run: pip-audit -r apps/sample-app/requirements.txt
+
+      - name: Run local DAST smoke test
+        env:
+          NEXUS_DAST_BASE_URL: https://traefik
+          NEXUS_DAST_HOST: nexus.localhost
+        run: python scripts/security_smoke.py
 
   deploy:
     name: Queue verified deployment

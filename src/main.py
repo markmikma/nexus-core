@@ -69,6 +69,10 @@ async def collect_http_metrics(request: Request, call_next):
 
     started = time.perf_counter()
     response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
     labels = ("orchestrator", request.method, request.url.path)
     HTTP_REQUESTS.labels(*labels, str(response.status_code)).inc()
     HTTP_REQUEST_DURATION.labels(*labels).observe(time.perf_counter() - started)
