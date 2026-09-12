@@ -26,8 +26,6 @@ class Settings:
     repository_url: str
     status_token: str
     deploy_token: str
-    dashboard_username: str
-    dashboard_password: str
     dashboard_admin_hash: str
     dashboard_viewer_hash: str
     poll_interval_seconds: int
@@ -51,8 +49,6 @@ class Settings:
             repository_url=os.getenv("GITEA_REPOSITORY_URL", ""),
             status_token=os.getenv("NEXUS_STATUS_TOKEN", ""),
             deploy_token=os.getenv("NEXUS_DEPLOY_TOKEN", ""),
-            dashboard_username=os.getenv("NEXUS_DASHBOARD_USERNAME", "admin"),
-            dashboard_password=os.getenv("NEXUS_DASHBOARD_PASSWORD", ""),
             dashboard_admin_hash=os.getenv("NEXUS_DASHBOARD_ADMIN_PASSWORD_HASH", ""),
             dashboard_viewer_hash=os.getenv("NEXUS_DASHBOARD_VIEWER_PASSWORD_HASH", ""),
             poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "3")),

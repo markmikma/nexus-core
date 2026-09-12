@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import hmac
 import logging
@@ -89,29 +88,20 @@ def healthz():
     return {"status": "ok", "service": "nexus-orchestrator"}
 
 
-def require_status_token(request: Request) -> None:
-    """Allows the automation token or local dashboard Basic Auth and audits attempts."""
+def require_status_token(request: Request) -> str:
+    """Authorize a signed local session or automation status token."""
     supplied_token = request.headers.get("X-Nexus-Status-Token", "")
     if settings.status_token and hmac.compare_digest(supplied_token, settings.status_token):
         audit_security_event("status_api_access", "success", "automation-token", request.url.path)
         return "admin"
+
     session_role = read_session(request.cookies.get(COOKIE_NAME), settings.status_token)
     if session_role:
         audit_security_event("dashboard_session", "success", session_role, request.url.path)
         return session_role
 
-    authorization = request.headers.get("Authorization", "")
-    if authorization.startswith("Basic ") and settings.dashboard_password:
-        try:
-            username, password = base64.b64decode(authorization[6:]).decode().split(":", 1)
-        except (ValueError, UnicodeDecodeError):
-            username, password = "", ""
-        if hmac.compare_digest(username, settings.dashboard_username) and hmac.compare_digest(password, settings.dashboard_password):
-            audit_security_event("dashboard_login", "success", username, request.url.path)
-            return "admin"
-
-    audit_security_event("dashboard_login", "failure", "unknown", request.url.path)
-    raise HTTPException(status_code=401, detail="Invalid dashboard credentials or status token.")
+    audit_security_event("dashboard_session", "failure", "unknown", request.url.path)
+    raise HTTPException(status_code=401, detail="Valid dashboard session or status token required.")
 
 
 def require_deploy_token(request: Request) -> None:
@@ -134,6 +124,15 @@ async def login(request: Request):
     response = JSONResponse({"role": role})
     response.set_cookie(COOKIE_NAME, make_session(role, settings.status_token), httponly=True, samesite="strict", max_age=28800)
     audit_security_event("dashboard_login", "success", username, "/auth/login")
+    return response
+
+
+@app.post("/auth/logout")
+def logout(request: Request):
+    role = read_session(request.cookies.get(COOKIE_NAME), settings.status_token)
+    response = JSONResponse({"logged_out": True})
+    response.delete_cookie(COOKIE_NAME, httponly=True, samesite="strict")
+    audit_security_event("dashboard_logout", "success", role or "unknown", "/auth/logout")
     return response
 
 
