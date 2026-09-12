@@ -65,6 +65,7 @@ jobs:
               "repository": "${{ gitea.repository }}",
               "ref": "${{ gitea.ref }}",
               "commit_hash": "${{ gitea.sha }}",
+              "environment": "dev",
           }
           request = Request(
               "http://orchestrator:8000/deployments/trigger",

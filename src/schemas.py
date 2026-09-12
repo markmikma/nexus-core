@@ -1,8 +1,12 @@
 """HTTP response schemas kept independent from SQLite implementation details."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+
+Environment = Literal["dev", "staging", "production"]
 
 
 class DeploymentJobResponse(BaseModel):
@@ -17,6 +21,7 @@ class DeploymentJobResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
+    environment: Environment = "dev"
 
 
 class DeploymentListResponse(BaseModel):
@@ -31,3 +36,9 @@ class DeploymentTriggerRequest(BaseModel):
     repository: str = Field(min_length=1, max_length=255)
     ref: str = Field(min_length=1, max_length=255)
     commit_hash: str = Field(min_length=40, max_length=40)
+    environment: Environment = "dev"
+
+
+class PromotionRequest(BaseModel):
+    source_environment: Literal["dev", "staging"]
+    target_environment: Literal["staging", "production"]

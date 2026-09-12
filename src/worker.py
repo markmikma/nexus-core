@@ -15,6 +15,7 @@ from src.db import (
 from src.docker_engine import build_and_deploy_app
 from src.security import audit_python_dependencies
 from src.reporting import report_directory, report_path
+from src.release import deployment_app_name
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -109,8 +110,9 @@ def process_job(job: dict) -> None:
         audit_python_dependencies(app_dir)
         logger.info("Dependency security scan sikeres: job=%s", job["id"])
 
+        environment = job.get("environment", "dev")
         result = build_and_deploy_app(
-            app_name="sample-app",
+            app_name=deployment_app_name(environment),
             app_dir=str(app_dir),
             repo_url=job["repository"],
             internal_port=8000,

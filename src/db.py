@@ -77,6 +77,10 @@ def init_db():
         )
     """)
 
+    columns = {row["name"] for row in cursor.execute("PRAGMA table_info(deployment_jobs)")}
+    if "environment" not in columns:
+        cursor.execute("ALTER TABLE deployment_jobs ADD COLUMN environment TEXT NOT NULL DEFAULT 'dev'")
+
     conn.commit()
     conn.close()
 
@@ -128,15 +132,15 @@ def record_webhook_event(delivery_id, event_type, repository, ref, commit_hash):
     return inserted
 
 
-def enqueue_deployment(delivery_id, app_name, repository, commit_hash):
+def enqueue_deployment(delivery_id, app_name, repository, commit_hash, environment="dev"):
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
         INSERT OR IGNORE INTO deployment_jobs
-        (delivery_id, app_name, repository, commit_hash)
-        VALUES (?, ?, ?, ?)
-    """, (delivery_id, app_name, repository, commit_hash))
+        (delivery_id, app_name, repository, commit_hash, environment)
+        VALUES (?, ?, ?, ?, ?)
+    """, (delivery_id, app_name, repository, commit_hash, environment))
 
     job_id = cursor.lastrowid if cursor.rowcount == 1 else None
     conn.commit()
@@ -144,7 +148,7 @@ def enqueue_deployment(delivery_id, app_name, repository, commit_hash):
     return job_id
 
 
-def enqueue_webhook_deployment(delivery_id, event_type, app_name, repository, ref, commit_hash):
+def enqueue_webhook_deployment(delivery_id, event_type, app_name, repository, ref, commit_hash, environment="dev"):
     """Atomically deduplicate a webhook and create its deployment job."""
     conn = get_connection()
     cursor = conn.cursor()
@@ -163,9 +167,9 @@ def enqueue_webhook_deployment(delivery_id, event_type, app_name, repository, re
 
         cursor.execute("""
             INSERT INTO deployment_jobs
-            (delivery_id, app_name, repository, commit_hash)
-            VALUES (?, ?, ?, ?)
-        """, (delivery_id, app_name, repository, commit_hash))
+            (delivery_id, app_name, repository, commit_hash, environment)
+            VALUES (?, ?, ?, ?, ?)
+        """, (delivery_id, app_name, repository, commit_hash, environment))
         job_id = cursor.lastrowid
         conn.commit()
         return job_id
@@ -282,3 +286,15 @@ def list_security_events(limit: int = 50):
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def latest_successful_deployment(environment: str):
+    conn = get_connection()
+    row = conn.execute(
+        """SELECT * FROM deployment_jobs
+        WHERE environment = ? AND status = 'success'
+        ORDER BY id DESC LIMIT 1""",
+        (environment,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None

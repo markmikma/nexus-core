@@ -15,7 +15,9 @@ from src.auth import COOKIE_NAME, make_session, read_session, verify_password
 from src.config import settings
 from src.db import (
     enqueue_webhook_deployment,
+    enqueue_deployment,
     get_deployment_job,
+    latest_successful_deployment,
     init_db,
     list_deployment_jobs,
     list_security_events,
@@ -23,10 +25,12 @@ from src.db import (
     record_webhook_event,
 )
 from src.reporting import list_reports, report_path
+from src.release import can_promote
 from src.schemas import (
     DeploymentJobResponse,
     DeploymentListResponse,
     DeploymentTriggerRequest,
+    PromotionRequest,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -214,6 +218,7 @@ def trigger_verified_deployment(
         repository=payload.repository,
         ref=payload.ref,
         commit_hash=payload.commit_hash,
+        environment=payload.environment,
     )
     if job_id is None:
         return {"accepted": True, "action": "duplicate_ignored"}
@@ -225,6 +230,48 @@ def trigger_verified_deployment(
         payload.commit_hash,
     )
     return {"accepted": True, "action": "queued", "job_id": job_id}
+
+
+@app.post("/releases/promote")
+def promote_release(payload: PromotionRequest, request: Request):
+    role = require_status_token(request)
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required.")
+    if not can_promote(payload.source_environment, payload.target_environment):
+        raise HTTPException(
+            status_code=400,
+            detail="Only dev to staging and staging to production promotions are allowed.",
+        )
+
+    source = latest_successful_deployment(payload.source_environment)
+    if source is None:
+        raise HTTPException(status_code=404, detail="No successful source release is available.")
+
+    delivery_id = (
+        f"promotion-{payload.source_environment}-to-{payload.target_environment}-"
+        f"{source['commit_hash']}"
+    )
+    job_id = enqueue_deployment(
+        delivery_id=delivery_id,
+        app_name="sample-app",
+        repository=source["repository"],
+        commit_hash=source["commit_hash"],
+        environment=payload.target_environment,
+    )
+    audit_security_event(
+        "release_promotion",
+        "success",
+        "admin",
+        f"{payload.source_environment}->{payload.target_environment}:{source['commit_hash']}",
+    )
+    return {
+        "accepted": True,
+        "source_environment": payload.source_environment,
+        "target_environment": payload.target_environment,
+        "commit_hash": source["commit_hash"],
+        "job_id": job_id,
+        "action": "queued" if job_id else "duplicate_ignored",
+    }
 
 
 @app.post("/webhooks/gitea")
