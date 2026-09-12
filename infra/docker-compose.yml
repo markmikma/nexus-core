@@ -96,6 +96,11 @@ services:
     environment:
       NEXUS_ALLOWED_REPOSITORY: nexusadmin/nexus-core
       GITEA_REPOSITORY_URL: ssh://git@gitea:22/nexusadmin/nexus-core.git
+      NEXUS_IMAGE_SCAN_ENABLED: "true"
+      NEXUS_IMAGE_SCAN_SEVERITIES: CRITICAL
+      NEXUS_TRIVY_IGNORE_UNFIXED: "true"
+      NEXUS_TRIVY_IMAGE: aquasec/trivy:0.57.1
+      NEXUS_TRIVY_CACHE_VOLUME: nexus-trivy-cache
     volumes:
       - ../data:/app/data
       - worker-workspace:/workspace
@@ -189,3 +194,5 @@ volumes:
   runner-data:
   prometheus-data:
   grafana-data:
+  trivy-cache:
+    name: nexus-trivy-cache

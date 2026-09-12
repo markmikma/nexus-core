@@ -69,6 +69,7 @@ class DeploymentRollbackTests(unittest.TestCase):
     def test_failed_health_check_removes_candidate_and_restores_previous_release(self):
         with (
             patch.object(engine, "get_nexus_network"),
+            patch.object(engine, "scan_image", return_value={"enabled": True, "findings": 0}),
             patch.object(engine, "register_or_update_app"),
             patch.object(engine, "log_deployment"),
             patch.object(
@@ -102,6 +103,7 @@ class DeploymentRollbackTests(unittest.TestCase):
     def test_healthy_candidate_is_promoted_and_previous_release_is_removed(self):
         with (
             patch.object(engine, "get_nexus_network"),
+            patch.object(engine, "scan_image", return_value={"enabled": True, "findings": 0}),
             patch.object(engine, "register_or_update_app"),
             patch.object(engine, "log_deployment"),
             patch.object(

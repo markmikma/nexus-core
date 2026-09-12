@@ -4,6 +4,7 @@ import docker
 
 from src.config import settings
 from src.db import log_deployment, register_or_update_app
+from src.image_security import scan_image
 
 try:
     client = docker.from_env()
@@ -124,6 +125,10 @@ def build_and_deploy_app(
             forcerm=True,
         )
         print(f"[✓] Docker image felépült: {image_tag}")
+
+        scan_summary = scan_image(client, image_tag)
+        if scan_summary["enabled"]:
+            print("[✓] Image security gate passed: no blocking findings.")
 
         previous = move_current_container_to_rollback_slot(container_name)
         labels = {
