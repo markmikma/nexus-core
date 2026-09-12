@@ -18,6 +18,8 @@ from src.db import (
     get_deployment_job,
     init_db,
     list_deployment_jobs,
+    list_security_events,
+    log_security_event,
     record_webhook_event,
 )
 from src.reporting import list_reports, report_path
@@ -48,6 +50,16 @@ HTTP_REQUEST_DURATION = Histogram(
     "HTTP request duration handled by Nexus-Core services.",
     ("service", "method", "path"),
 )
+SECURITY_EVENTS = Counter(
+    "nexus_security_events_total",
+    "Security-relevant Nexus events.",
+    ("event_type", "outcome", "actor"),
+)
+
+
+def audit_security_event(event_type: str, outcome: str, actor: str, detail: str | None = None) -> None:
+    SECURITY_EVENTS.labels(event_type, outcome, actor).inc()
+    log_security_event(event_type, outcome, actor, detail)
 
 
 @app.middleware("http")
@@ -77,9 +89,10 @@ def healthz():
 
 
 def require_status_token(request: Request) -> None:
-    """Allows the automation token or local dashboard Basic Auth."""
+    """Allows the automation token or local dashboard Basic Auth and audits attempts."""
     supplied_token = request.headers.get("X-Nexus-Status-Token", "")
     if settings.status_token and hmac.compare_digest(supplied_token, settings.status_token):
+        audit_security_event("status_api_access", "success", "automation-token", request.url.path)
         return
 
     authorization = request.headers.get("Authorization", "")
@@ -89,8 +102,10 @@ def require_status_token(request: Request) -> None:
         except (ValueError, UnicodeDecodeError):
             username, password = "", ""
         if hmac.compare_digest(username, settings.dashboard_username) and hmac.compare_digest(password, settings.dashboard_password):
+            audit_security_event("dashboard_login", "success", username, request.url.path)
             return
 
+    audit_security_event("dashboard_login", "failure", "unknown", request.url.path)
     raise HTTPException(status_code=401, detail="Invalid dashboard credentials or status token.")
 
 
@@ -141,6 +156,13 @@ def download_security_report(commit_hash: str, report_type: str, request: Reques
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Security report not found.")
     return FileResponse(path, media_type="application/json", filename=path.name)
+
+
+@app.get("/security-events")
+def get_security_events(request: Request, limit: int = Query(default=50, ge=1, le=200)):
+    require_status_token(request)
+    events = list_security_events(limit)
+    return {"items": events, "count": len(events)}
 
 
 @app.post("/deployments/trigger")

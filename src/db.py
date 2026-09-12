@@ -51,6 +51,17 @@ def init_db():
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS security_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            outcome TEXT NOT NULL,
+            actor TEXT NOT NULL,
+            detail TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS deployment_jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             delivery_id TEXT UNIQUE NOT NULL,
@@ -252,3 +263,22 @@ def finish_deployment(job_id, status, logs=None, container_id=None):
 
     conn.commit()
     conn.close()
+
+
+def log_security_event(event_type, outcome, actor, detail=None):
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO security_events (event_type, outcome, actor, detail) VALUES (?, ?, ?, ?)",
+        (event_type, outcome, actor, detail),
+    )
+    conn.commit()
+    conn.close()
+
+
+def list_security_events(limit: int = 50):
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM security_events ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
