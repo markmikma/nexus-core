@@ -86,9 +86,11 @@ services:
       - "traefik.docker.network=nexus-net"
       - "traefik.http.routers.orchestrator.rule=Host(`orchestrator.localhost`)"
       - "traefik.http.routers.orchestrator.entrypoints=web"
+      - "traefik.http.routers.orchestrator.service=orchestrator"
       - "traefik.http.services.orchestrator.loadbalancer.server.port=8000"
       - "traefik.http.routers.nexus-dashboard.rule=Host(`nexus.localhost`)"
       - "traefik.http.routers.nexus-dashboard.entrypoints=web"
+      - "traefik.http.routers.nexus-dashboard.service=nexus-dashboard"
       - "traefik.http.services.nexus-dashboard.loadbalancer.server.port=8000"
   deployment-worker:
     build:
