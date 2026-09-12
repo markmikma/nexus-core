@@ -298,3 +298,12 @@ def latest_successful_deployment(environment: str):
     ).fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def queued_deployment_count() -> int:
+    conn = get_connection()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM deployment_jobs WHERE status = 'queued'"
+    ).fetchone()[0]
+    conn.close()
+    return count

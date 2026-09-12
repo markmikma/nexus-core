@@ -10,3 +10,14 @@ groups:
         annotations:
           summary: Repeated failed Nexus dashboard logins
           description: Five or more failed dashboard/API authentication attempts occurred within ten minutes.
+
+  - name: nexus-operations
+    rules:
+      - alert: NexusDeploymentQueueBacklog
+        expr: nexus_deployment_queue_depth > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Nexus deployment queue is backlogged
+          description: More than five deployment jobs have waited for five minutes.

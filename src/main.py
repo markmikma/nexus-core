@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
-from prometheus_client import Counter, Histogram, make_asgi_app
+from prometheus_client import Counter, Gauge, Histogram, make_asgi_app
 
 from src.auth import COOKIE_NAME, make_session, read_session, verify_password
 from src.config import settings
@@ -18,6 +18,7 @@ from src.db import (
     enqueue_deployment,
     get_deployment_job,
     latest_successful_deployment,
+    queued_deployment_count,
     init_db,
     list_deployment_jobs,
     list_security_events,
@@ -54,6 +55,11 @@ HTTP_REQUEST_DURATION = Histogram(
     "HTTP request duration handled by Nexus-Core services.",
     ("service", "method", "path"),
 )
+DEPLOYMENT_QUEUE_DEPTH = Gauge(
+    "nexus_deployment_queue_depth",
+    "Number of deployment jobs waiting for a worker.",
+)
+
 SECURITY_EVENTS = Counter(
     "nexus_security_events_total",
     "Security-relevant Nexus events.",
@@ -69,6 +75,7 @@ def audit_security_event(event_type: str, outcome: str, actor: str, detail: str 
 @app.middleware("http")
 async def collect_http_metrics(request: Request, call_next):
     if request.url.path == "/metrics":
+        DEPLOYMENT_QUEUE_DEPTH.set(queued_deployment_count())
         return await call_next(request)
 
     started = time.perf_counter()
@@ -94,6 +101,22 @@ def dashboard():
 @app.get("/healthz")
 def healthz():
     return {"status": "ok", "service": "nexus-orchestrator"}
+
+
+@app.get("/readyz")
+def readyz():
+    missing = []
+    if not settings.status_token:
+        missing.append("status_token")
+    if not settings.session_secret:
+        missing.append("session_secret")
+    try:
+        queued = queued_deployment_count()
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Database is not ready.") from error
+    if missing:
+        raise HTTPException(status_code=503, detail={"missing_configuration": missing})
+    return {"status": "ready", "queued_deployments": queued}
 
 
 def require_status_token(request: Request) -> str:
